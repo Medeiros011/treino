@@ -1,12 +1,12 @@
 /* Service Worker — permite usar o app offline */
-const CACHE = 'treinos-v3';
+const CACHE = 'treinos-v4';
 const ASSETS = [
   './',
   './index.html',
   './treinos.js',
   './manifest.json',
   './icon.svg',
-  './cbum2024.webp',
+  './cbum2024.jpg',
   './cbum.jpg'
 ];
 
