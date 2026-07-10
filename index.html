@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Meus Treinos</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root{
+      --bg:#0a0a0b; --bg2:#0f0f11; --card:#131316; --card2:#1b1b1f; --line:#2a2a30;
+      --txt:#f2f2f4; --muted:#8a8a92; --red:#e10600; --red2:#ff2a1f; --redglow:rgba(225,6,0,.45);
+      --ok:#e10600; --warn:#ffb648; --radius:14px;
+    }
+    *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+    html,body{margin:0; padding:0;}
+    body{
+      background:var(--bg); color:var(--txt);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      padding-bottom:env(safe-area-inset-bottom); overscroll-behavior-y:contain;
+    }
+    body::before{
+      content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+      background:
+        radial-gradient(120% 60% at 50% -10%, rgba(225,6,0,.14), transparent 60%),
+        radial-gradient(80% 50% at 100% 100%, rgba(225,6,0,.06), transparent 60%);
+    }
+    header{
+      position:sticky; top:0; z-index:20; background:rgba(10,10,11,.82);
+      backdrop-filter:blur(12px); border-bottom:1px solid var(--line);
+      padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+      display:flex; align-items:center; gap:12px; min-height:56px;
+    }
+    header .back{
+      background:var(--card2); border:1px solid var(--line); color:var(--txt);
+      width:40px; height:40px; border-radius:11px; font-size:22px; cursor:pointer;
+      display:none; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    header .back:active{background:var(--red); border-color:var(--red);}
+    header h1{font-size:16px; margin:0; font-weight:800; flex:1; line-height:1.15;
+      text-transform:uppercase; letter-spacing:1px;}
+    header h1 small{display:block; font-size:11px; color:var(--red2); font-weight:700;
+      letter-spacing:2px; margin-top:3px; text-transform:uppercase;}
+    main{padding:16px; max-width:640px; margin:0 auto;}
+
+    /* HERO CBUM */
+    .hero{
+      position:relative; border-radius:18px; overflow:hidden; margin-bottom:20px;
+      border:1px solid var(--line); box-shadow:0 0 40px -12px var(--redglow);
+      background:#000;
+    }
+    .hero img{
+      width:100%; height:300px; object-fit:cover; object-position:42% 28%; display:block;
+      filter:contrast(1.08) saturate(1.05) brightness(.94);
+    }
+    .hero .grad{
+      position:absolute; inset:0;
+      background:linear-gradient(180deg, rgba(10,10,11,.15) 0%, rgba(10,10,11,.05) 40%, rgba(10,10,11,.92) 100%),
+                 linear-gradient(90deg, rgba(225,6,0,.22), transparent 55%);
+    }
+    .hero .content{position:absolute; left:0; right:0; bottom:0; padding:18px 18px 16px;}
+    .hero .kicker{
+      display:inline-block; font-size:11px; font-weight:800; letter-spacing:2.5px;
+      color:#fff; background:var(--red); padding:4px 10px; border-radius:6px;
+      text-transform:uppercase; margin-bottom:10px; box-shadow:0 0 18px -2px var(--redglow);
+    }
+    .hero h2{margin:0; font-size:30px; font-weight:900; line-height:.98;
+      text-transform:uppercase; letter-spacing:-.5px; text-shadow:0 2px 20px rgba(0,0,0,.7);}
+    .hero h2 b{color:var(--red2);}
+    .hero p{margin:6px 0 0; font-size:12.5px; color:#cfcfd4; font-weight:600; letter-spacing:.3px;}
+    .hero .credit{
+      position:absolute; top:8px; right:10px; font-size:9px; color:rgba(255,255,255,.55);
+      background:rgba(0,0,0,.4); padding:2px 7px; border-radius:99px; letter-spacing:.3px;
+    }
+
+    .section-label{font-size:11px; letter-spacing:3px; color:var(--muted); font-weight:800;
+      text-transform:uppercase; margin:0 2px 12px;}
+
+    /* CARDS DE TREINO */
+    .treino-card{
+      position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+      padding:18px; margin-bottom:12px; cursor:pointer; display:flex; align-items:center; gap:15px;
+      transition:transform .1s, border-color .2s, box-shadow .2s; overflow:hidden;
+    }
+    .treino-card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--red);}
+    .treino-card:active{transform:scale(.985); border-color:var(--red); box-shadow:0 0 24px -8px var(--redglow);}
+    .treino-badge{
+      width:52px; height:52px; border-radius:12px; flex-shrink:0; margin-left:4px;
+      background:linear-gradient(135deg,var(--red2),#7a0300);
+      display:flex; align-items:center; justify-content:center;
+      font-size:23px; font-weight:900; color:#fff; box-shadow:0 0 18px -4px var(--redglow);
+    }
+    .treino-card .info{flex:1; min-width:0;}
+    .treino-card .info h3{margin:0 0 3px; font-size:16px; font-weight:800; text-transform:uppercase; letter-spacing:.5px;}
+    .treino-card .info p{margin:0; color:var(--muted); font-size:13px;}
+    .treino-card .info .count{color:var(--red2); font-size:11px; margin-top:6px; font-weight:800; letter-spacing:1px; text-transform:uppercase;}
+    .treino-card .chev{color:var(--red); font-size:24px; font-weight:700;}
+
+    /* EXERCÍCIOS */
+    .progress-wrap{margin-bottom:18px;}
+    .progress-top{display:flex; justify-content:space-between; font-size:11px; font-weight:800;
+      letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:7px;}
+    .progress-top b{color:var(--red2);}
+    .progress-bar{height:7px; background:var(--card2); border-radius:99px; overflow:hidden;}
+    .progress-bar > div{height:100%; background:linear-gradient(90deg,var(--red),var(--red2));
+      width:0%; transition:width .3s; box-shadow:0 0 12px -1px var(--redglow);}
+    .ex{
+      background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+      margin-bottom:14px; overflow:hidden; transition:border-color .2s;
+    }
+    .ex.done{border-color:var(--red);}
+    .ex-media{width:100%; aspect-ratio:16/11; background:#fff; position:relative; overflow:hidden;}
+    .ex-img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; background:#fff;}
+    .ex-media .f1{opacity:0;}
+    .ex-media .f1.anim{animation:exflip 1.6s linear infinite;}
+    @keyframes exflip{0%,48%{opacity:0} 52%,100%{opacity:1}}
+    .ex-media .frame-dot{
+      position:absolute; bottom:8px; right:10px; font-size:10px; color:#fff; font-weight:700;
+      background:rgba(225,6,0,.85); padding:3px 8px; border-radius:99px; letter-spacing:.5px;
+    }
+    .placeholder{
+      width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--muted);
+      font-size:12px; text-align:center; padding:10px; gap:8px; flex-direction:column; background:var(--card2);
+    }
+    .ex-body{padding:15px;}
+    .ex-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+    .ex-head h3{margin:0; font-size:15.5px; line-height:1.3; font-weight:800;}
+    .tag{
+      font-size:10px; font-weight:800; color:var(--red2); background:rgba(225,6,0,.13);
+      border:1px solid rgba(225,6,0,.3); padding:3px 9px; border-radius:99px; white-space:nowrap;
+      align-self:flex-start; text-transform:uppercase; letter-spacing:.5px;
+    }
+    .ex-meta{display:flex; gap:20px; margin:13px 0;}
+    .ex-meta .m span{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px;}
+    .ex-meta .m strong{font-size:17px; margin-top:2px; display:block; font-weight:800;}
+    .obs{font-size:12.5px; color:#b8b8bf; background:var(--card2); border-left:2px solid var(--red);
+      border-radius:8px; padding:10px 12px; margin:0 0 13px; line-height:1.45;}
+
+    .carga{display:flex; align-items:center; gap:10px; margin-bottom:13px;}
+    .carga label{font-size:12px; color:var(--muted); flex-shrink:0; font-weight:700; text-transform:uppercase; letter-spacing:.5px;}
+    .carga input{
+      flex:1; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+      border-radius:9px; padding:10px 12px; font-size:15px; min-width:0; font-weight:600;
+    }
+    .carga input:focus{outline:none; border-color:var(--red); box-shadow:0 0 0 3px rgba(225,6,0,.15);}
+    .carga .unit{color:var(--muted); font-size:12px; font-weight:700;}
+
+    .series{display:flex; gap:7px; margin-bottom:12px;}
+    .serie-btn{
+      flex:1; min-width:0; background:var(--card2); border:1px solid var(--line);
+      color:var(--muted); border-radius:9px; padding:11px 2px; font-size:11px; font-weight:700;
+      cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; transition:.15s;
+      text-transform:uppercase; letter-spacing:.3px;
+    }
+    .serie-btn .n{font-size:15px; color:var(--txt); font-weight:800;}
+    .serie-btn.done{background:var(--red); border-color:var(--red); color:#fff; box-shadow:0 0 16px -4px var(--redglow);}
+    .serie-btn.done .n{color:#fff;}
+
+    .rest-btn{
+      width:100%; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+      border-radius:11px; padding:13px; font-size:13.5px; font-weight:800; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:8px; text-transform:uppercase; letter-spacing:.5px;
+    }
+    .rest-btn:active{background:var(--red); border-color:var(--red);}
+
+    /* TIMER */
+    .timer-overlay{
+      position:fixed; inset:0; z-index:100; background:rgba(4,4,5,.96); backdrop-filter:blur(8px);
+      display:none; flex-direction:column; align-items:center; justify-content:center; gap:24px; padding:24px;
+    }
+    .timer-overlay.show{display:flex;}
+    .timer-ring{position:relative; width:240px; height:240px; filter:drop-shadow(0 0 24px var(--redglow));}
+    .timer-ring svg{transform:rotate(-90deg);}
+    .timer-ring .num{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      font-size:56px; font-weight:900; font-variant-numeric:tabular-nums;}
+    .timer-label{color:var(--muted); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:2px; text-align:center;}
+    .timer-actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+    .timer-actions button{
+      background:var(--card2); border:1px solid var(--line); color:var(--txt);
+      border-radius:11px; padding:14px 20px; font-size:14px; font-weight:800; cursor:pointer;
+      text-transform:uppercase; letter-spacing:.5px;
+    }
+    .timer-actions .primary{background:var(--red); border-color:var(--red);}
+    .timer-actions .stop{background:transparent; border-color:var(--line); color:var(--muted);}
+
+    .reset-btn{
+      width:100%; background:transparent; border:1px solid var(--line); color:var(--muted);
+      border-radius:11px; padding:13px; font-size:12.5px; cursor:pointer; margin-top:2px;
+      text-transform:uppercase; letter-spacing:1px; font-weight:700;
+    }
+    .reset-btn:active{border-color:var(--red); color:var(--red2);}
+    .install-tip{
+      background:rgba(225,6,0,.08); border:1px solid rgba(225,6,0,.28); border-radius:11px;
+      padding:12px 14px; font-size:12.5px; color:#b8b8bf; margin-bottom:16px; line-height:1.5;
+      display:flex; gap:10px; align-items:flex-start;
+    }
+    .install-tip b{color:var(--txt);}
+    .install-tip button{margin-left:auto; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;}
+  </style>
+</head>
+<body>
+  <header>
+    <button class="back" id="backBtn" aria-label="Voltar">‹</button>
+    <h1 id="title">Meus Treinos<small id="subtitle">Sem desculpas</small></h1>
+  </header>
+  <main id="app"></main>
+
+  <div class="timer-overlay" id="timerOverlay">
+    <div class="timer-ring">
+      <svg width="240" height="240">
+        <circle cx="120" cy="120" r="108" fill="none" stroke="#1b1b1f" stroke-width="14"/>
+        <circle id="timerCircle" cx="120" cy="120" r="108" fill="none" stroke="#e10600" stroke-width="14"
+          stroke-linecap="round" stroke-dasharray="678.5" stroke-dashoffset="0"/>
+      </svg>
+      <div class="num" id="timerNum">0:00</div>
+    </div>
+    <div class="timer-label" id="timerLabel">Descanso</div>
+    <div class="timer-actions">
+      <button id="timerAdd">+15s</button>
+      <button class="primary" id="timerToggle">Pausar</button>
+      <button class="stop" id="timerStop">Encerrar</button>
+    </div>
+  </div>
+
+  <script src="treinos.js"></script>
+  <script>
+  (function(){
+    const app = document.getElementById('app');
+    const titleEl = document.getElementById('title');
+    const subtitleEl = document.getElementById('subtitle');
+    const backBtn = document.getElementById('backBtn');
+    const store = {
+      get(k, def){ try{ const v=localStorage.getItem('treino_'+k); return v===null?def:JSON.parse(v); }catch(e){ return def; } },
+      set(k, v){ localStorage.setItem('treino_'+k, JSON.stringify(v)); }
+    };
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    /* ---------- HOME ---------- */
+    function renderHome(){
+      backBtn.style.display='none';
+      titleEl.childNodes[0].nodeValue='Meus Treinos';
+      subtitleEl.textContent='Sem desculpas';
+      let html = `
+        <section class="hero">
+          <img src="cbum2024.webp" alt="Chris Bumstead - Mr. Olympia 2024" onerror="if(this.src.indexOf('cbum.jpg')<0){this.src='cbum.jpg';}else{this.style.height='150px';}">
+          <span class="credit">CBUM · Mr. Olympia 2024</span>
+          <div class="grad"></div>
+          <div class="content">
+            <span class="kicker">6× Mr. Olympia · Classic Physique</span>
+            <h2>SEM <b>MODO FÁCIL</b></h2>
+            <p>Disciplina bate motivação. Bora treinar. 🔥</p>
+          </div>
+        </section>
+        <div class="section-label">Escolha o treino de hoje</div>`;
+      if(!store.get('hideInstall', false)){
+        html += `<div class="install-tip" id="installTip">
+          <span>📲</span>
+          <div><b>Instale na tela inicial:</b> no navegador, toque no menu (⋮ ou compartilhar) e escolha
+          <b>"Adicionar à tela inicial"</b>. Abre como app e funciona sem internet.</div>
+          <button onclick="__hideInstall()">×</button>
+        </div>`;
+      }
+      TREINOS.forEach(t=>{
+        html += `<div class="treino-card" onclick="__openTreino('${t.id}')">
+          <div class="treino-badge">${t.id}</div>
+          <div class="info">
+            <h3>${esc(t.nome)}</h3>
+            <p>${esc(t.foco)}</p>
+            <div class="count">${t.exercicios.length} exercícios</div>
+          </div>
+          <div class="chev">›</div>
+        </div>`;
+      });
+      app.innerHTML = html;
+      window.scrollTo(0,0);
+    }
+    window.__hideInstall = function(){ store.set('hideInstall', true); const t=document.getElementById('installTip'); if(t) t.remove(); };
+
+    /* ---------- TREINO ---------- */
+    function renderTreino(id){
+      const t = TREINOS.find(x=>x.id===id);
+      if(!t){ renderHome(); return; }
+      backBtn.style.display='flex';
+      titleEl.childNodes[0].nodeValue=t.nome;
+      subtitleEl.textContent=t.foco;
+
+      let html = `<div class="progress-wrap">
+        <div class="progress-top"><span>Progresso</span><span id="progTxt"></span></div>
+        <div class="progress-bar"><div id="progFill"></div></div>
+      </div>`;
+      t.exercicios.forEach((ex, i)=>{
+        const key = id+'_'+i;
+        const cargaVal = store.get('carga_'+key, '');
+        const seriesDone = store.get('series_'+key, []);
+        const total = ex.series;
+        let seriesHtml='';
+        for(let s=0; s<total; s++){
+          const on = seriesDone.includes(s);
+          seriesHtml += `<button class="serie-btn ${on?'done':''}" onclick="__toggleSerie('${id}',${i},${s})">
+            <span class="n">${s+1}ª</span>${on?'ok':'série'}</button>`;
+        }
+        const imgs = ex.imgs && ex.imgs.length ? ex.imgs : [];
+        const frame1 = imgs.length>1
+          ? `<img class="ex-img f1 anim" src="${imgs[1]}" alt="" loading="lazy" onerror="this.remove()">
+             <span class="frame-dot">● execução</span>` : '';
+        const mediaHtml = imgs.length
+          ? `<div class="ex-media">
+               <img class="ex-img f0" src="${imgs[0]}" alt="${esc(ex.nome)}" loading="lazy" onerror="__imgErr(this)">
+               ${frame1}
+             </div>`
+          : `<div class="ex-media"><div class="placeholder">${phSvg()}<span>Sem imagem</span></div></div>`;
+
+        html += `<div class="ex ${seriesDone.length===total?'done':''}" id="ex_${key}">
+          ${mediaHtml}
+          <div class="ex-body">
+            <div class="ex-head">
+              <h3>${i+1}. ${esc(ex.nome)}</h3>
+              <span class="tag">${esc(ex.musculo||'')}</span>
+            </div>
+            <div class="ex-meta">
+              <div class="m"><span>Séries</span><strong>${ex.series}</strong></div>
+              <div class="m"><span>Reps</span><strong>${esc(ex.reps)}</strong></div>
+              <div class="m"><span>Descanso</span><strong>${ex.descanso}s</strong></div>
+            </div>
+            ${ex.obs?`<p class="obs">💡 ${esc(ex.obs)}</p>`:''}
+            <div class="carga">
+              <label>Carga</label>
+              <input type="text" inputmode="decimal" placeholder="ex: 20" value="${esc(cargaVal)}"
+                onchange="__saveCarga('${key}', this.value)"><span class="unit">kg</span>
+            </div>
+            <div class="series">${seriesHtml}</div>
+            <button class="rest-btn" onclick="__rest('${id}',${i})">⏱️ Descanso ${ex.descanso}s</button>
+          </div>
+        </div>`;
+      });
+      html += `<button class="reset-btn" onclick="__resetTreino('${id}')">↺ Zerar séries deste treino</button>`;
+      app.innerHTML = html;
+      updateProgress(id);
+      window.scrollTo(0,0);
+    }
+
+    function phSvg(){
+      return `<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M6.5 8v8M17.5 8v8" stroke-linecap="round"/></svg>`;
+    }
+    window.__imgErr = function(img){
+      const m = img.closest('.ex-media');
+      if(m) m.innerHTML = `<div class="placeholder">${phSvg()}<span>Imagem indisponível</span></div>`;
+    };
+    window.__saveCarga = (key,val)=> store.set('carga_'+key, val);
+
+    window.__toggleSerie = function(id, exIdx, s){
+      const key = id+'_'+exIdx;
+      let done = store.get('series_'+key, []);
+      done = done.includes(s) ? done.filter(x=>x!==s) : done.concat(s);
+      store.set('series_'+key, done);
+      // atualiza só este exercício, sem re-render (mantém scroll e animação)
+      const t = TREINOS.find(x=>x.id===id);
+      const exEl = document.getElementById('ex_'+key);
+      if(exEl){
+        const btns = exEl.querySelectorAll('.serie-btn');
+        btns.forEach((b,idx)=>{
+          const on = done.includes(idx);
+          b.classList.toggle('done', on);
+          b.lastChild.textContent = on ? 'ok' : 'série';
+        });
+        exEl.classList.toggle('done', done.length===t.exercicios[exIdx].series);
+      }
+      updateProgress(id);
+    };
+    window.__resetTreino = function(id){
+      const t = TREINOS.find(x=>x.id===id);
+      t.exercicios.forEach((ex,i)=> store.set('series_'+id+'_'+i, []));
+      renderTreino(id);
+    };
+    function updateProgress(id){
+      const t = TREINOS.find(x=>x.id===id);
+      let total=0, done=0;
+      t.exercicios.forEach((ex,i)=>{ total+=ex.series; done += store.get('series_'+id+'_'+i, []).length; });
+      const fill = document.getElementById('progFill');
+      const txt = document.getElementById('progTxt');
+      if(fill) fill.style.width = (total? (done/total*100):0)+'%';
+      if(txt) txt.innerHTML = `<b>${done}</b> / ${total} séries`;
+    }
+
+    /* ---------- CRONÔMETRO ---------- */
+    const overlay = document.getElementById('timerOverlay');
+    const tNum = document.getElementById('timerNum');
+    const tLabel = document.getElementById('timerLabel');
+    const tCircle = document.getElementById('timerCircle');
+    const tToggle = document.getElementById('timerToggle');
+    const CIRC = 2*Math.PI*108;
+    let tInterval=null, tRemain=0, tTotal=0, tPaused=false;
+    function fmt(s){ const m=Math.floor(s/60); return m+':'+String(s%60).padStart(2,'0'); }
+    function drawTimer(){
+      tNum.textContent = fmt(tRemain);
+      tCircle.style.strokeDashoffset = CIRC*(1 - tRemain/tTotal);
+      tCircle.setAttribute('stroke', tRemain<=5 ? '#ff2a1f' : (tRemain<=10?'#ffb648':'#e10600'));
+    }
+    window.__rest = function(id, i){
+      const t = TREINOS.find(x=>x.id===id); if(!t) return;
+      const ex = t.exercicios[i]; if(!ex) return;
+      __startTimer(ex.descanso, ex.nome);
+    };
+    window.__startTimer = function(sec, nome){
+      tTotal = tRemain = sec; tPaused=false;
+      tLabel.textContent = 'Descanso · ' + (nome||'');
+      tToggle.textContent='Pausar';
+      tCircle.style.strokeDasharray = CIRC;
+      overlay.classList.add('show'); drawTimer();
+      clearInterval(tInterval); tInterval=setInterval(tick,1000);
+    };
+    function tick(){ if(tPaused) return; tRemain--; if(tRemain<=0){ zero(); return; } drawTimer(); }
+    function zero(){
+      tRemain=0; drawTimer(); clearInterval(tInterval);
+      tNum.textContent='0:00'; tLabel.textContent='Acabou o descanso! 🔥'; beep(); vibrate();
+      setTimeout(()=>overlay.classList.remove('show'),1200);
+    }
+    tToggle.onclick=function(){ tPaused=!tPaused; this.textContent=tPaused?'Retomar':'Pausar'; };
+    document.getElementById('timerAdd').onclick=function(){ tRemain+=15; tTotal=Math.max(tTotal,tRemain); drawTimer(); };
+    document.getElementById('timerStop').onclick=function(){ clearInterval(tInterval); overlay.classList.remove('show'); };
+    function vibrate(){ if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]); }
+    function beep(){
+      try{
+        const ctx=new (window.AudioContext||window.webkitAudioContext)();
+        [0,.25,.5].forEach(d=>{
+          const o=ctx.createOscillator(), g=ctx.createGain();
+          o.connect(g); g.connect(ctx.destination); o.frequency.value=880; o.type='sine';
+          g.gain.setValueAtTime(.0001, ctx.currentTime+d);
+          g.gain.exponentialRampToValueAtTime(.3, ctx.currentTime+d+.02);
+          g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime+d+.2);
+          o.start(ctx.currentTime+d); o.stop(ctx.currentTime+d+.22);
+        });
+      }catch(e){}
+    }
+
+    /* ---------- ROTEAMENTO ---------- */
+    window.__openTreino = id => { location.hash='#/'+id; };
+    backBtn.onclick = ()=> { location.hash=''; };
+    function route(){ const m=location.hash.match(/#\/(\w+)/); if(m) renderTreino(m[1]); else renderHome(); }
+    window.addEventListener('hashchange', route);
+    route();
+
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+  })();
+  </script>
+</body>
+</html>

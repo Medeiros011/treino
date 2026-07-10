@@ -1,0 +1,14 @@
+{
+  "name": "Meus Treinos",
+  "short_name": "Treinos",
+  "description": "Ficha de treino da academia com imagens, cronômetro e registro de cargas.",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
