@@ -1,5 +1,5 @@
 /* Service Worker — permite usar o app offline */
-const CACHE = 'treinos-v4';
+const CACHE = 'treinos-v5';
 const ASSETS = [
   './',
   './index.html',
