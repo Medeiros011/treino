@@ -1,14 +1,23 @@
 {
-  "name": "Meus Treinos",
+  "name": "Meus Treinos — Força, Corrida e Dieta",
   "short_name": "Treinos",
-  "description": "Ficha de treino da academia com imagens, cronômetro e registro de cargas.",
-  "start_url": "index.html",
+  "description": "Plano híbrido de força e corrida com plano alimentar barato, cronômetro, cargas e gráficos de evolução.",
+  "id": "./",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0b",
   "theme_color": "#0a0a0b",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Registrar corrida", "url": "./#/corrida" },
+    { "name": "Treino de força", "url": "./#/forca" },
+    { "name": "Dieta", "url": "./#/dieta" }
   ]
 }
