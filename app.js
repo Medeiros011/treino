@@ -43,19 +43,36 @@ function applyTheme(){
 }
 
 /* =============================== PERFIL e METAS =============================== */
-const PERFIL_PADRAO = { peso:80, altura:175, idade:35, objetivo:'perder', t5k:'30:00' };
+const PERFIL_PADRAO = { peso:93, pesoMeta:80, altura:175, idade:35, objetivo:'perder', t5k:'29:30' };
+(function migrarPerfil(){ const p=store.get('perfil',null); if(p && (p.v||1)<2){ p.peso=93; p.pesoMeta=80; p.objetivo='perder'; if(!p.t5k||p.t5k==='30:00') p.t5k='29:30'; p.v=2; store.set('perfil',p);
+  const pe=store.get('peso',[]); if(!pe.length){ store.set('peso',[{d:iso(new Date()),kg:93}]); } } })();
 const perfil = () => Object.assign({}, PERFIL_PADRAO, store.get('perfil', {}));
-function metas(){
-  const p = perfil();
-  const tmb = 10*p.peso + 6.25*p.altura - 5*p.idade + 5;      // Mifflin-St Jeor (homem)
-  const gasto = tmb * 1.6;                                      // treina força 5× + corrida 3×
-  const ajuste = {perder:-450, manter:0, ganhar:250}[p.objetivo] || 0;
-  const kcal = Math.round((gasto+ajuste)/10)*10;
-  const prot = Math.round(p.peso * ({perder:2.2, manter:1.8, ganhar:2.0}[p.objetivo]||2));
-  const gord = Math.round(p.peso * 0.8);
-  const carb = Math.max(100, Math.round((kcal - prot*4 - gord*9)/4));
-  return { tmb:Math.round(tmb), gasto:Math.round(gasto), kcal, prot, gord, carb, agua:(p.peso*0.035).toFixed(1) };
+function tipoDiaAuto(){ const dow=new Date().getDay(); if(dow===0||dow===3) return 'forte'; if(dow===6) return 'descanso'; return 'normal'; }
+function tipoDia(){ const t=store.get('tipoDia',null); return t && t.d===today() ? t.v : tipoDiaAuto(); }
+function metas(tipo){
+  const p = perfil(), alvo = p.pesoMeta || p.peso;
+  const tmb = 10*p.peso + 6.25*p.altura - 5*p.idade + 5;            // Mifflin-St Jeor (homem)
+  const gasto = tmb * 1.6;                                            // força 5× + corrida 3× + trabalho administrativo
+  let kcal;
+  if(p.objetivo==='perder'){ kcal = Math.min(gasto*0.78, gasto-400); kcal = Math.max(kcal, tmb*1.15); }   // déficit ~22%: tira gordura sem sacrificar músculo
+  else if(p.objetivo==='ganhar') kcal = gasto + 250; else kcal = gasto;
+  kcal += store.get('ajusteKcal', 0);
+  kcal = Math.round(kcal/10)*10;
+  const prot = Math.round(p.objetivo==='perder' ? Math.max(2.2*alvo, 1.8*p.peso) : p.peso*({manter:1.8, ganhar:2.0}[p.objetivo]||2));
+  const gord = Math.round(Math.max(50, 0.7*alvo));
+  let carb = Math.max(90, Math.round((kcal - prot*4 - gord*9)/4));
+  const t = tipo || tipoDia(); const dc = t==='forte' ? Math.round(carb*0.2) : t==='descanso' ? -Math.round(carb*0.2) : 0;   // carboidrato cíclico
+  carb += dc; kcal += dc*4;
+  return { tmb:Math.round(tmb), gasto:Math.round(gasto), kcal, prot, gord, carb, tipo:t, agua:(p.peso*0.035).toFixed(1) };
 }
+function pesoAtual(){ const pe=store.get('peso',[]); return pe.length ? pe[pe.length-1].kg : perfil().peso; }
+function ritmoPerda(){ // kg/semana nas últimas 5 semanas (tendência, não pesagem isolada)
+  const pe=store.get('peso',[]).filter(x=>parseISO(x.d) >= addDays(new Date(),-35)); if(pe.length<3) return null;
+  const t0=parseISO(pe[0].d).getTime(); const xs=pe.map(x=>(parseISO(x.d).getTime()-t0)/(7*864e5)), ys=pe.map(x=>x.kg);
+  const n=xs.length, mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n; let nu=0, de=0; xs.forEach((x,i)=>{ nu+=(x-mx)*(ys[i]-my); de+=(x-mx)*(x-mx); });
+  if(!de || xs[n-1]<1.5) return null; return -nu/de;
+}
+
 function segs(t){ const p=String(t||'').trim().split(':').map(Number); if(p.some(isNaN)||!p.length) return null; return p.length===3 ? p[0]*3600+p[1]*60+p[2] : p.length===2 ? p[0]*60+p[1] : p[0]*60; }
 function fmtPace(s){ s=Math.round(s); return Math.floor(s/60)+':'+pad(s%60); }
 function fmtTempo(s){ s=Math.round(s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return h ? h+':'+pad(m)+':'+pad(x) : m+':'+pad(x); }
@@ -63,7 +80,14 @@ function ritmos(){
   const t5 = segs(perfil().t5k) || 1800, p5 = t5/5;
   return { p5, leve:[p5*1.2, p5*1.3], limiar:p5*1.05, k10:p5*1.045, int:p5, tiro:p5-8, previsao10k:t5*Math.pow(2,1.06) };
 }
-function trocaRitmo(txt){
+function longoBase(){
+  const fixo = store.get('longoBase', null); if(fixo) return fixo;
+  const lim = iso(addDays(new Date(),-35)); const mx = runs().filter(r=>r.d>=lim).reduce((m,r)=>Math.max(m,r.km),0);
+  return Math.max(6, Math.min(12, Math.round(mx||7)+1)); }
+function kmSessao(s){ return s.t==='LONG' ? Math.min(16, longoBase()+s.rel) : s.km; }
+function minSessao(s){ return s.t==='LONG' ? Math.round(kmSessao(s)*ritmos().leve[1]/60) : s.min; }
+function trocaRitmo(txt, s){
+  if(s && s.t==='LONG') txt = txt.replace('{km}', fmtBR(kmSessao(s)));
   const r = ritmos();
   const map = { leve:fmtPace(r.leve[0])+'–'+fmtPace(r.leve[1])+'/km', limiar:fmtPace(r.limiar)+'/km', '10k':fmtPace(r.k10)+'/km', int:fmtPace(r.int)+'/km', tiro:fmtPace(r.tiro)+'/km' };
   return esc(txt).replace(/\{(leve|limiar|10k|int|tiro)\}/g, (_,k)=>'<b>'+map[k]+'</b>');
@@ -231,7 +255,7 @@ function renderHoje(){
   if(pf.t){ const feito = doneToday(pf.t.id);
     html += '<div class="card"><div class="next" data-go="#/forca/'+pf.t.id+'"><div class="badge">'+pf.t.id+'</div><div class="info"><h3>'+(feito?'✓ ':'')+esc(pf.t.foco)+'</h3><p>'+esc(pf.t.sub)+' · '+pf.t.exercicios.length+' exercícios'+(feito?' · feito hoje':'')+'</p></div><div class="go">›</div></div>'+(pf.aviso?'<div class="aviso">⚠️ '+esc(pf.aviso)+'</div>':'')+'</div>'; }
   html += '<div class="label">Corrida · almoço e domingo</div>';
-  if(pc){ html += '<div class="card"><div class="next" data-go="#/corrida"><div class="badge run">'+({Q:'TIRO',L:'LEVE',T:'LIM',LONG:'LONG',TESTE:'10K'}[pc.s.t])+'</div><div class="info"><h3>'+esc(pc.s.nome)+'</h3><p>'+trocaRitmo(pc.s.principal)+'</p><p class="small">Semana '+pc.sem+' de '+CORRIDA.length+' · '+esc(pc.fase)+' · '+esc(DIA_SESSAO[pc.s.t])+' · ~'+pc.s.min+' min</p></div><div class="go">›</div></div></div>'; }
+  if(pc){ html += '<div class="card"><div class="next" data-go="#/corrida"><div class="badge run">'+({Q:'TIRO',L:'LEVE',T:'LIM',LONG:'LONG',TESTE:'10K'}[pc.s.t])+'</div><div class="info"><h3>'+esc(pc.s.nome)+'</h3><p>'+trocaRitmo(pc.s.principal, pc.s)+'</p><p class="small">Semana '+pc.sem+' de '+CORRIDA.length+' · '+esc(pc.fase)+' · '+esc(DIA_SESSAO[pc.s.t])+' · ~'+minSessao(pc.s)+' min</p></div><div class="go">›</div></div></div>'; }
   else html += '<div class="card"><div class="empty" style="padding:10px">✅ As 3 corridas desta semana estão feitas. Descanse as pernas.</div></div>';
   // semana
   html += '<div class="label">Sua semana</div><div class="card"><div class="semana">';
@@ -241,9 +265,9 @@ function renderHoje(){
   html += '</div><div class="leg" style="margin-top:10px"><span><i style="background:var(--forca)"></i>Força</span><span><i style="background:var(--corrida)"></i>Corrida</span></div></div>';
   // combustível
   html += '<div class="label">Combustível de hoje</div><div class="card" data-go="#/dieta" style="cursor:pointer"><div class="macros"><div><b>'+m.kcal+'</b><span>kcal</span></div><div><b>'+m.prot+'g</b><span>Proteína</span></div><div><b>'+m.carb+'g</b><span>Carbo</span></div><div><b>'+m.agua+'L</b><span>Água</span></div></div></div>';
-  html += '<div class="row" style="margin-top:4px"><button class="btn sec" data-go="#/forca">Ver ficha de força</button><button class="btn blue" id="hjReg">Registrar corrida</button></div>';
+  html += '<div class="row" style="margin-top:4px"><button class="btn sec" data-go="#/forca">Ver ficha de força</button><button class="btn blue" id="hjReg">📸 Registrar corrida</button></div>';
   app.innerHTML = html;
-  ligarGo(); $('hjReg').onclick = ()=>sheetCorrida();
+  ligarGo(); $('hjReg').onclick = ()=>lerPrint();
 }
 function ligarGo(){ app.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>{ location.hash=e.dataset.go; }); }
 
@@ -313,16 +337,20 @@ function renderCorrida(){
     '<div class="bar blue" style="margin-top:14px"><div style="width:'+(feitas/totalS*100)+'%"></div></div><div class="small muted" style="margin-top:6px">'+feitas+' de '+totalS+' corridas do plano · previsão de 10K hoje: <b style="color:var(--txt)">'+fmtTempo(r.previsao10k)+'</b></div></div>';
   html += '<div class="card" style="padding-top:4px">';
   w.s.forEach((s,i)=>{ const f = sessaoFeita(semVista,i);
-    html += '<div class="sess'+(f?' done':'')+'"><div class="tag '+s.t.toLowerCase()+'">'+(f?'✓':({Q:'TIRO',L:'LEVE',T:'LIM',LONG:'LONG',TESTE:'10K'}[s.t]))+'</div><div class="bd"><h4>'+esc(s.nome)+(f?' <span class="pill ok">'+fmtBR(f.km)+' km · '+fmtPace(f.seg/f.km)+'/km</span>':'')+'</h4><div class="quando">'+esc(DIA_SESSAO[s.t])+' · ~'+s.min+' min · ~'+fmtBR(s.km)+' km</div>'+
-      '<div class="pr">'+trocaRitmo(s.principal)+'</div>'+(s.t!=='L'?'<div class="ext">'+esc(AQ)+'<br>'+esc(DQ)+'</div>':'')+
+    html += '<div class="sess'+(f?' done':'')+'"><div class="tag '+s.t.toLowerCase()+'">'+(f?'✓':({Q:'TIRO',L:'LEVE',T:'LIM',LONG:'LONG',TESTE:'10K'}[s.t]))+'</div><div class="bd"><h4>'+esc(s.nome)+(f?' <span class="pill ok">'+fmtBR(f.km)+' km · '+fmtPace(f.seg/f.km)+'/km</span>':'')+'</h4><div class="quando">'+esc(DIA_SESSAO[s.t])+' · ~'+minSessao(s)+' min · ~'+fmtBR(kmSessao(s))+' km</div>'+
+      '<div class="pr">'+trocaRitmo(s.principal, s)+'</div>'+(s.t!=='L'?'<div class="ext">'+esc(AQ)+'<br>'+esc(DQ)+'</div>':'')+
       '<div class="acts">'+(f?'<button data-undo="'+f.id+'">Desfazer</button>':'<button class="reg" data-reg="'+i+'">Registrar</button>')+'</div></div></div>'; });
   html += '</div>';
+  const est = estimar5k(), atualT5 = segs(perfil().t5k);
+  html += '<div class="label">Seu nível</div><div class="card"><div class="grid2"><div><div class="small muted" style="font-weight:800;letter-spacing:1px">LONGÃO BASE</div><div class="h2" style="margin-top:4px">'+fmtBR(longoBase())+' km</div><div class="small muted">'+(store.get('longoBase',null)?'definido por você':'seu maior longão recente + 1 km')+'</div></div><div><div class="small muted" style="font-weight:800;letter-spacing:1px">5 KM ESTIMADO</div><div class="h2" style="margin-top:4px">'+esc(perfil().t5k)+'</div><div class="small muted">base dos ritmos</div></div></div>'+
+    (est && est.t5 < atualT5-10 ? '<div class="aviso" style="color:var(--ok);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3)">📈 Pela corrida de '+est.r.d.split('-').reverse().slice(0,2).join('/')+' seu 5 km já está perto de <b>'+fmtTempo(est.t5)+'</b>. <a href="#" id="usarEst" style="color:var(--ok);font-weight:800">Atualizar ritmos</a></div>' : '')+
+    '<div class="row" style="margin-top:12px"><button class="btn sec" id="ajLongo" style="font-size:12px;padding:11px">Ajustar longão</button><button class="btn sec" id="ajT5" style="font-size:12px;padding:11px">Ajustar 5 km</button></div></div>';
   html += '<div class="label">Seus ritmos</div><div class="card"><div class="zonas">'+
     '<div><b>'+fmtPace(r.leve[0])+'</b><span>Leve</span></div><div><b>'+fmtPace(r.limiar)+'</b><span>Limiar</span></div><div><b>'+fmtPace(r.k10)+'</b><span>10K</span></div><div><b>'+fmtPace(r.int)+'</b><span>Interv.</span></div><div><b>'+fmtPace(r.tiro)+'</b><span>Tiro</span></div></div>'+
     '<div class="small muted" style="margin-top:10px">Calculados a partir do seu 5 km em <b style="color:var(--txt)">'+esc(perfil().t5k)+'</b>. Leve = dá para conversar. Atualize depois do teste de 10K. <a href="#" id="editT5" style="color:var(--red2)">Alterar</a></div></div>';
   const rs = runs().slice().sort((a,b)=>b.d.localeCompare(a.d)||b.id-a.id).slice(0,8);
   html += '<div class="label">Últimas corridas</div><div class="card">'+(rs.length? rs.map(x=>{ const [,mm,dd]=x.d.split('-'); return '<div class="runrow"><div class="d">'+dd+'/'+mm+'</div><div class="k"><b>'+fmtBR(x.km)+' km</b><div class="small muted">'+esc(x.tipo||'Corrida')+'</div></div><div class="p"><b>'+fmtPace(x.seg/x.km)+'/km</b>'+fmtTempo(x.seg)+'</div><button data-del="'+x.id+'" aria-label="Apagar">🗑</button></div>'; }).join('') : '<div class="empty">Nenhuma corrida registrada. Corra e registre aqui (dá para copiar do Nike Run Club).</div>')+'</div>';
-  html += '<button class="btn blue" id="regLivre">+ Registrar corrida avulsa</button>';
+  html += '<div class="row"><button class="btn blue" id="regPrint">📸 Ler print da corrida</button><button class="btn sec" id="regLivre" style="width:auto;padding:0 16px">Manual</button></div>';
   html += '<button class="btn ghost" id="reiniciar" style="margin-top:10px">Recomeçar o plano nesta semana</button>';
   app.innerHTML = html;
   $('wPrev').onclick=()=>{ semVista=Math.max(1,semVista-1); renderCorrida(); };
@@ -330,23 +358,108 @@ function renderCorrida(){
   app.querySelectorAll('[data-reg]').forEach(b=>b.onclick=()=>sheetCorrida(semVista, +b.dataset.reg));
   app.querySelectorAll('[data-undo],[data-del]').forEach(b=>b.onclick=()=>{ const id=+(b.dataset.undo||b.dataset.del); store.set('runs', runs().filter(x=>x.id!==id)); toast('Corrida removida'); renderCorrida(); });
   $('regLivre').onclick=()=>sheetCorrida();
+  $('regPrint').onclick=()=>lerPrint();
   $('editT5').onclick=e=>{ e.preventDefault(); sheetPerfil(); };
+  $('ajT5').onclick=()=>sheetPerfil();
+  $('ajLongo').onclick=()=>{ const v=prompt('Qual o maior longão que você correu recentemente (km)? O plano começa 1 km acima. Deixe em branco para o app calcular pelas suas corridas.', ''); if(v===null) return; const n=num(v); store.set('longoBase', n? Math.max(5,Math.min(14,Math.round(n)+1)) : null); renderCorrida(); };
+  if($('usarEst')) $('usarEst').onclick=e=>{ e.preventDefault(); const p=store.get('perfil',{}); p.t5k=fmtTempo(est.t5); store.set('perfil',p); toast('Ritmos atualizados: 5 km em '+p.t5k); renderCorrida(); };
   $('reiniciar').onclick=()=>{ if(confirm('Recomeçar o plano de 12 semanas a partir desta semana? As corridas registradas continuam no histórico.')){ store.set('corridaInicio', iso(mondayOf(new Date()))); store.set('runs', runs().map(x=>Object.assign({},x,{ses:null}))); semVista=1; renderCorrida(); } };
 }
-function sheetCorrida(sem, i){
+function estimar5k(){ // melhor esforço forte (sensação ≥ 4, tiros ou teste) dos últimos 60 dias, pela fórmula de Riegel
+  const lim=iso(addDays(new Date(),-60)); let melhor=null;
+  runs().filter(r=>r.d>=lim && r.km>=3 && (r.sens>=4 || /teste|prova/i.test(r.tipo||''))).forEach(r=>{ const t5=r.seg*Math.pow(5/r.km,1.06); if(!melhor||t5<melhor.t5) melhor={t5, r}; });
+  return melhor;
+}
+/* ----- leitura do print (Nike Run Club, relógio, Strava…) ----- */
+const MESES_PT = {jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function lerTextoCorrida(txt){
+  const t = ' '+txt.replace(/[“”″]/g,'"').replace(/[‘’´`′]/g,"'").replace(/\s+/g,' ')+' ';
+  const r = {};
+  // ritmo: 6'06" · 6'06'' · 6:06 /km
+  let m = t.match(/(\d{1,2})\s*'\s*(\d{2})\s*(?:"|'')?/) || t.match(/(\d{1,2}):(\d{2})\s*(?:min)?\s*\/\s*km/i);
+  if(m){ const p=+m[1]*60+ +m[2]; if(p>=180 && p<=900) r.pace=p; }
+  // distância: número seguido de km / quilômetros
+  const ds=[...t.matchAll(/(\d{1,2}[.,]\d{1,2})\s*(?:km|quil[oô]metros?|kilometers?)\b/gi)].map(x=>parseFloat(x[1].replace(',','.'))).filter(x=>x>0.5&&x<60);
+  if(ds.length) r.km = ds[0];
+  else { const dec=[...t.matchAll(/\b(\d{1,2}[.,]\d{2})\b/g)].map(x=>parseFloat(x[1].replace(',','.'))).filter(x=>x>=1&&x<=45); if(dec.length) r.km=Math.max(...dec); }
+  // tempo: h:mm:ss ou mm:ss (o maior que não seja o ritmo)
+  const tempos=[...t.matchAll(/\b(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b/g)].map(x=>(x[1]?+x[1]*3600:0)+ +x[2]*60+ +x[3]).filter(x=>x>=300 && x<=6*3600);
+  if(tempos.length){
+    if(r.km && r.pace){ const alvo=r.km*r.pace; tempos.sort((a,b)=>Math.abs(a-alvo)-Math.abs(b-alvo)); r.seg=tempos[0]; }
+    else r.seg=Math.max(...tempos);
+  }
+  if(!r.seg && r.km && r.pace) r.seg=Math.round(r.km*r.pace);
+  if(!r.km && r.seg && r.pace) r.km=Math.round(r.seg/r.pace*100)/100;
+  // cadência
+  m = t.match(/(\d{3})\s*(?:spm|ppm|passos\/min)/i) || t.match(/cad[eê]ncia[^0-9]{0,15}(\d{3})/i); if(m && +m[1]>120 && +m[1]<220) r.cad=+m[1];
+  // data
+  m = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if(m && +m[2]<=12){ const y = m[3] ? (m[3].length===2?2000+ +m[3]:+m[3]) : new Date().getFullYear(); r.d = y+'-'+pad(+m[2])+'-'+pad(+m[1]); }
+  else { m = t.match(/\b(\d{1,2})\s+de\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç.]*(?:\s+de\s+(\d{4}))?/i); if(m){ const y=m[3]?+m[3]:new Date().getFullYear(); r.d=y+'-'+pad(MESES_PT[m[2].toLowerCase()])+'-'+pad(+m[1]); } }
+  if(r.d && r.d>today()) delete r.d;
+  return r;
+}
+let tessP = null;
+function carregarOCR(){
+  if(tessP) return tessP;
+  tessP = new Promise((ok,ko)=>{ const sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; sc.onload=()=>ok(window.Tesseract); sc.onerror=()=>{ tessP=null; ko(new Error('sem internet')); }; document.head.appendChild(sc); });
+  return tessP;
+}
+function lerPrint(sem, i){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  inp.onchange=async()=>{
+    const fs=[...inp.files]; if(!fs.length) return;
+    openSheet('<h3>Lendo o print…</h3><p class="sub" id="ocrSt">Preparando o leitor (na primeira vez baixa ~4 MB).</p><div class="bar blue"><div id="ocrBar" style="width:5%"></div></div><img id="ocrImg" style="width:100%;border-radius:12px;margin-top:14px;max-height:300px;object-fit:contain;background:#000">');
+    $('ocrImg').src=URL.createObjectURL(fs[0]);
+    try{
+      const T = await carregarOCR();
+      const w = await T.createWorker('por', 1, { logger:m=>{ if(m.status==='recognizing text'){ $('ocrBar').style.width=(10+m.progress*85)+'%'; $('ocrSt').textContent='Lendo números… '+Math.round(m.progress*100)+'%'; } } });
+      let texto='';
+      for(const f of fs){ const { data } = await w.recognize(f); texto += '\n'+data.text; }
+      await w.terminate();
+      const r = lerTextoCorrida(texto);
+      sheetCorrida(sem, i, r, texto);
+      toast(r.km && r.seg ? 'Print lido — confira e salve' : 'Não li tudo: complete o que faltar');
+    }catch(e){ sheetCorrida(sem, i, {}, ''); toast('Não consegui ler agora ('+(e.message||'erro')+'). Preencha à mão.'); }
+  };
+  inp.click();
+}
+/* ----- registro (manual, por print ou por link) ----- */
+function sheetCorrida(sem, i, pre, ocrTxt){
+  pre = pre || {};
+  if(sem==null){ const pc=proximaCorrida(); if(pc && !pre.livre){ sem=pc.sem; i=pc.i; } }
   const s = sem ? CORRIDA[sem-1].s[i] : null;
-  openSheet('<h3>Registrar corrida</h3><p class="sub">'+(s?esc(s.nome)+' · semana '+sem:'Corrida avulsa (fora do plano)')+'</p>'+
-    '<div class="grid2"><div class="field"><label>Distância (km)</label><input class="inp" id="rKm" inputmode="decimal" placeholder="5,0" value="'+(s?String(s.km).replace('.',','):'')+'"></div>'+
-    '<div class="field"><label>Tempo (h:mm:ss ou mm:ss)</label><input class="inp" id="rT" inputmode="numeric" placeholder="32:30"></div></div>'+
-    '<div class="field"><label>Data</label><input class="inp" type="date" id="rD" value="'+today()+'"></div>'+
+  const opts = CORRIDA[ (sem||semanaAtual())-1 ].s.map((x,k)=>'<option value="'+k+'"'+(k===i?' selected':'')+'>'+esc(x.nome)+' (semana '+(sem||semanaAtual())+')</option>').join('');
+  openSheet('<h3>Registrar corrida</h3><p class="sub">'+(pre.km||pre.seg?'📸 Dados lidos do print — confira antes de salvar.':'Distância, tempo e como foi.')+'</p>'+
+    '<div class="field"><label>Treino do plano</label><select class="inp" id="rSes"><option value="">Avulsa (fora do plano)</option>'+opts+'</select></div>'+
+    '<div class="grid2"><div class="field"><label>Distância (km)</label><input class="inp" id="rKm" inputmode="decimal" placeholder="5,0" value="'+(pre.km!=null?String(pre.km).replace('.',','):(s?String(kmSessao(s)).replace('.',','):''))+'"></div>'+
+    '<div class="field"><label>Tempo (h:mm:ss ou mm:ss)</label><input class="inp" id="rT" inputmode="numeric" placeholder="32:30" value="'+(pre.seg?fmtTempo(pre.seg):'')+'"></div></div>'+
+    '<div class="grid2"><div class="field"><label>Data</label><input class="inp" type="date" id="rD" value="'+(pre.d||today())+'"></div><div class="field"><label>Cadência (opcional)</label><input class="inp" id="rCad" inputmode="numeric" placeholder="158" value="'+(pre.cad||'')+'"></div></div>'+
+    '<div class="field"><label>Sensação de esforço</label><div class="seg" id="rSens">'+[1,2,3,4,5].map(n=>'<button type="button" data-v="'+n+'" class="'+(pre.sens===n?'sel':'')+'">'+n+'</button>').join('')+'</div><div class="small muted" style="margin-top:6px">1 muito fácil · 3 moderado · 5 máximo</div></div>'+
     '<div class="small muted" id="rPace" style="margin:-2px 0 14px">Ritmo: —</div>'+
-    '<button class="btn blue" id="rSalvar">Salvar corrida</button><button class="btn ghost" id="rCancel" style="margin-top:10px">Cancelar</button>');
-  const upd=()=>{ const km=num($('rKm').value), sg=segs($('rT').value); $('rPace').textContent = km&&sg ? 'Ritmo: '+fmtPace(sg/km)+'/km' : 'Ritmo: —'; };
-  $('rKm').oninput=upd; $('rT').oninput=upd;
-  $('rCancel').onclick=closeSheet;
+    '<button class="btn blue" id="rSalvar">Salvar corrida</button>'+
+    '<div class="row" style="margin-top:10px"><button class="btn sec" id="rPrint">📸 Ler outro print</button><button class="btn ghost" id="rCancel">Cancelar</button></div>'+
+    (ocrTxt?'<details><summary>Texto lido do print</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--muted)">'+esc(ocrTxt.trim().slice(0,1200))+'</pre></details>':''));
+  if(sem==null) $('rSes').value='';
+  const upd=()=>{ const km=num($('rKm').value), sg=segs($('rT').value); $('rPace').innerHTML = km&&sg ? 'Ritmo: <b style="color:var(--txt)">'+fmtPace(sg/km)+'/km</b>' : 'Ritmo: —'; };
+  $('rKm').oninput=upd; $('rT').oninput=upd; upd();
+  document.querySelectorAll('#rSens button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#rSens button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); });
+  $('rCancel').onclick=closeSheet; $('rPrint').onclick=()=>lerPrint(sem, i);
   $('rSalvar').onclick=()=>{ const km=num($('rKm').value), sg=segs($('rT').value); if(!km||!sg){ toast('Informe distância e tempo'); return; }
-    const l=runs(); l.push({ id:Date.now(), d:$('rD').value||today(), km, seg:sg, tipo:s?s.nome:'Corrida avulsa', ses: s ? sem+'-'+i : null }); store.set('runs', l);
+    const sesI = $('rSes').value===''?null:+$('rSes').value, w=sem||semanaAtual(), sx = sesI!=null ? CORRIDA[w-1].s[sesI] : null;
+    const sb=document.querySelector('#rSens .sel');
+    const l=runs(); l.push({ id:Date.now(), d:$('rD').value||today(), km, seg:sg, sens: sb? +sb.dataset.v : null, cad: num($('rCad').value)||null, tipo: sx?sx.nome:'Corrida avulsa', ses: sx ? w+'-'+sesI : null }); store.set('runs', l);
     closeSheet(); vibrar([30,30,60]); toast('🏃 '+fmtBR(km)+' km a '+fmtPace(sg/km)+'/km registrados'); route(); };
+}
+/* ----- importação por link (enviado pelo Claude na conversa) -----
+   #/importar?c=AAAA-MM-DD_km_tempo_sensação_tipo;… */
+function importarLink(q){
+  const par = new URLSearchParams(q); const c = par.get('c'); if(!c) return 0;
+  const l = runs(); let n = 0;
+  c.split(';').forEach(reg=>{ const [d,km,t,sens,tipo] = reg.split('_'); const k=num(km), sg=segs(t); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!k||!sg) return;
+    if(l.some(x=>x.d===d && Math.abs(x.km-k)<0.05)) return;
+    l.push({ id:Date.now()+n, d, km:k, seg:sg, sens: num(sens)||null, tipo: tipo ? decodeURIComponent(tipo).replace(/\+/g,' ') : 'Corrida', ses:null }); n++; });
+  store.set('runs', l); return n;
 }
 
 /* ---------- DIETA ---------- */
@@ -356,11 +469,37 @@ function renderDieta(){
   const m = metas(), p = perfil(), refeicoes = dietaEscalada();
   const tot = refeicoes.reduce((t,r)=>{ t.kcal+=r.tot.kcal; t.p+=r.tot.p; t.c+=r.tot.c; t.g+=r.tot.g; return t; },{kcal:0,p:0,c:0,g:0});
   const kp=tot.p*4, kc=tot.c*4, kg=tot.g*9, kt=kp+kc+kg;
-  const obj = {perder:'Perder gordura',manter:'Manter o peso',ganhar:'Ganhar massa'}[p.objetivo];
-  let html = '<div class="card"><div class="small muted" style="font-weight:800;letter-spacing:1.5px;text-transform:uppercase">Sua meta · '+esc(obj)+'</div><div class="meta-k" style="margin-top:6px"><b>'+Math.round(tot.kcal)+'</b><span class="muted">kcal / dia (meta '+m.kcal+')</span></div>'+
+  const obj = {perder:'Perder gordura e manter o músculo',manter:'Manter o peso',ganhar:'Ganhar massa'}[p.objetivo];
+  let html = '';
+  if(p.objetivo==='perder'){
+    const pa = pesoAtual(), ini = (store.get('peso',[])[0]||{kg:pa}).kg, meta = p.pesoMeta||80, falta = Math.max(0, pa-meta), feito = Math.max(0, ini-pa);
+    const rp = ritmoPerda(), alvoSem = [pa*0.005, pa*0.01];
+    const semanas = Math.ceil(falta/((alvoSem[0]+alvoSem[1])/2)), dataPrev = addDays(new Date(), semanas*7);
+    let aval = '<span class="muted">Pese-se 1× por semana, em jejum, sempre no mesmo dia. Com 3 pesagens o app avalia seu ritmo.</span>';
+    if(rp!=null){
+      if(rp > alvoSem[1]*1.15) aval = '<span style="color:var(--warn)">⚠️ Perdendo <b>'+fmtBR(rp)+' kg/semana</b> — rápido demais, risco de perder músculo. <a href="#" id="ajMais" style="color:var(--warn);font-weight:800">Subir 150 kcal</a></span>';
+      else if(rp < alvoSem[0]*0.5) aval = '<span style="color:var(--warn)">⚠️ Ritmo de <b>'+fmtBR(Math.max(0,rp))+' kg/semana</b> — abaixo do ideal. Revise os fins de semana ou <a href="#" id="ajMenos" style="color:var(--warn);font-weight:800">baixar 150 kcal</a></span>';
+      else aval = '<span style="color:var(--ok)">✓ Perdendo <b>'+fmtBR(rp)+' kg/semana</b> — ritmo ideal para preservar a massa magra.</span>';
+    }
+    html += '<div class="card"><div class="ctitle"><h3>Jornada até '+fmtBR(meta)+' kg</h3><span>'+fmtBR(pa)+' kg hoje</span></div>'+
+      '<div class="bar"><div style="width:'+(ini>meta?Math.min(100,feito/(ini-meta)*100):0)+'%"></div></div>'+
+      '<div class="grid2" style="margin-top:12px"><div><div class="h2">'+fmtBR(feito)+' kg</div><div class="small muted">eliminados</div></div><div style="text-align:right"><div class="h2">'+fmtBR(falta)+' kg</div><div class="small muted">faltam · previsão '+MESES[dataPrev.getMonth()]+'/'+dataPrev.getFullYear()+'</div></div></div>'+
+      '<div class="small" style="margin-top:12px;line-height:1.5">Ritmo ideal: <b>'+fmtBR(alvoSem[0])+'–'+fmtBR(alvoSem[1])+' kg por semana</b> (0,5–1% do peso). '+aval+'</div></div>';
+  }
+  const td = m.tipo;
+  html += '<div class="card"><div class="small muted" style="font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Tipo de dia</div><div class="seg" id="tipoDia">'+
+    [['forte','🔥 Longão / tiros'],['normal','Treino normal'],['descanso','Descanso']].map(([k,n])=>'<button data-t="'+k+'" class="'+(td===k?'sel':'')+'">'+n+'</button>').join('')+'</div>'+
+    '<div class="small muted" style="margin-top:8px">'+(td==='forte'?'Mais carboidrato hoje para render na corrida e recuperar.':td==='descanso'?'Menos carboidrato hoje; a proteína continua igual.':'Dia padrão.')+' A proteína nunca muda: é ela que protege o músculo.</div></div>';
+  html += '<div class="card"><div class="small muted" style="font-weight:800;letter-spacing:1.5px;text-transform:uppercase">Sua meta · '+esc(obj)+'</div><div class="meta-k" style="margin-top:6px"><b>'+Math.round(tot.kcal)+'</b><span class="muted">kcal / dia (meta '+m.kcal+')</span></div>'+
     '<div class="macrobar"><i style="width:'+(kp/kt*100)+'%;background:var(--forca)"></i><i style="width:'+(kc/kt*100)+'%;background:var(--corrida)"></i><i style="width:'+(kg/kt*100)+'%;background:#ffc24a"></i></div>'+
     '<div class="leg"><span><i style="background:var(--forca)"></i>Proteína <b>'+Math.round(tot.p)+' g</b></span><span><i style="background:var(--corrida)"></i>Carbo <b>'+Math.round(tot.c)+' g</b></span><span><i style="background:#ffc24a"></i>Gordura <b>'+Math.round(tot.g)+' g</b></span></div>'+
-    '<div class="small muted" style="margin-top:10px">Peso '+fmtBR(p.peso)+' kg · gasto estimado '+m.gasto+' kcal · água '+m.agua+' L/dia (+0,5 L nos dias de corrida). <a href="#" id="edPerfil" style="color:var(--red2)">Ajustar perfil</a></div></div>';
+    '<div class="small muted" style="margin-top:10px">Peso '+fmtBR(p.peso)+' kg · gasto estimado '+m.gasto+' kcal · água '+m.agua+' L/dia (+0,5 L nos dias de corrida). <a href="#" id="edPerfil" style="color:var(--red2)">Ajustar perfil</a>'+(store.get('ajusteKcal',0)?' · ajuste manual '+(store.get('ajusteKcal',0)>0?'+':'')+store.get('ajusteKcal',0)+' kcal <a href="#" id="ajZero" style="color:var(--red2)">zerar</a>':'')+'</div></div>';
+  if(p.objetivo==='perder') html += '<div class="label">Proteger a massa magra</div><div class="card"><ul class="regras" style="margin:0;padding-left:18px">'+
+    '<li><b>'+m.prot+' g de proteína por dia</b>, divididos em 5–6 refeições com 30–40 g cada.</li>'+
+    '<li><b>Não alivie a carga na musculação</b>: é o sinal que manda o corpo manter o músculo. Se as cargas caírem mais de 10%, o déficit está forte demais.</li>'+
+    '<li><b>Déficit moderado</b>: perder mais de 1% do peso por semana come músculo junto com a gordura.</li>'+
+    '<li><b>Durma 7 h ou mais</b>: sono curto aumenta a perda de massa magra e a fome.</li>'+
+    '<li><b>1 refeição livre por semana</b>, de preferência depois do longão — sem virar fim de semana livre.</li></ul></div>';
   html += '<div class="label">Refeições do dia</div>';
   refeicoes.forEach(r=>{
     html += '<div class="card meal" data-meal="'+r.id+'"><div class="meal-h"><div class="ico">'+ICONES[r.id]+'</div><div class="t"><h3>'+esc(r.nome)+'</h3><p>'+esc(r.hora)+'</p></div><div class="kc">'+Math.round(r.tot.kcal)+'<span>'+Math.round(r.tot.p)+' g prot.</span></div></div>'+
@@ -381,6 +520,10 @@ function renderDieta(){
   app.querySelectorAll('.meal').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
   app.querySelectorAll('[data-preco]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation(); inp.onchange=()=>{ const v=num(inp.value); if(v==null) return; const pr=store.get('precos',{}); pr[inp.dataset.preco]=v; store.set('precos',pr); renderDieta(); }; });
   $('edPerfil').onclick=e=>{ e.preventDefault(); sheetPerfil(); };
+  app.querySelectorAll('#tipoDia button').forEach(b=>b.onclick=()=>{ store.set('tipoDia',{d:today(), v:b.dataset.t}); renderDieta(); });
+  const aj = d=>e=>{ e.preventDefault(); store.set('ajusteKcal', (store.get('ajusteKcal',0))+d); toast((d>0?'+':'')+d+' kcal na meta diária'); renderDieta(); };
+  if($('ajMais')) $('ajMais').onclick=aj(150); if($('ajMenos')) $('ajMenos').onclick=aj(-150);
+  if($('ajZero')) $('ajZero').onclick=e=>{ e.preventDefault(); store.set('ajusteKcal',0); renderDieta(); };
 }
 
 /* ---------- EVOLUÇÃO ---------- */
@@ -412,14 +555,14 @@ function renderEvolucao(){
   barras($('chFreq'), semanas.map(w=>w.lb), [{nome:'Força',cor:cF,valores:fW},{nome:'Corrida',cor:cC,valores:cW}], {min:4, passoLabel:2, fmtY:v=>Math.round(v), fmtV:v=>v+' treino'+(v!==1?'s':''), tip:i=>'Semana de '+semanas[i].lb, aria:'Treinos de força e corrida por semana'});
   barras($('chKm'), semanas.map(w=>w.lb), [{nome:'Km',cor:cC,valores:kmW}], {min:10, passoLabel:2, fmtY:v=>Math.round(v), fmtV:v=>fmtBR(v)+' km', tip:i=>'Semana de '+semanas[i].lb, aria:'Quilômetros por semana'});
   // linha de meta do plano (semana atual) desenhada sobre o gráfico de km
-  const metaKm = CORRIDA[semanaAtual()-1].s.reduce((s,x)=>s+x.km,0); const svgKm=$('chKm').querySelector('svg');
+  const metaKm = CORRIDA[semanaAtual()-1].s.reduce((s,x)=>s+kmSessao(x),0); const svgKm=$('chKm').querySelector('svg');
   if(svgKm){ const maxK = niceMax(Math.max(10,...kmW)); if(metaKm<maxK){ const y = 10 + (170-32)*(1-metaKm/maxK); svgKm.insertAdjacentHTML('beforeend','<line x1="30" x2="334" y1="'+y+'" y2="'+y+'" stroke="'+cor('--muted')+'" stroke-dasharray="4 4"/><text class="ax" x="334" y="'+(y-4)+'" text-anchor="end">plano: '+fmtBR(metaKm)+' km</text>'); } }
   const rs = runs().slice().sort((a,b)=>a.d.localeCompare(b.d)).slice(-20);
   linha($('chPace'), rs.map(x=>({x:x.d.slice(8)+'/'+x.d.slice(5,7), y:x.seg/x.km, tip:'<div class="muted">'+x.d.split('-').reverse().join('/')+'</div><b>'+fmtPace(x.seg/x.km)+'/km</b> · '+fmtBR(x.km)+' km'})), {cor:cC, inverter:true, fmtY:v=>fmtPace(v), vazio:'Registre corridas para ver seu ritmo evoluir.', aria:'Ritmo por corrida'});
   const desenhaCarga = k => { const h = hist(k||''); linha($('chCarga'), h.map(x=>({x:x.d.slice(8)+'/'+x.d.slice(5,7), y:x.kg, tip:'<div class="muted">'+x.d.split('-').reverse().join('/')+'</div><b>'+fmtBR(x.kg)+' kg</b>'})), {fmtY:v=>fmtBR(Math.round(v)), vazio:'Anote as cargas nos treinos de força para ver a progressão.', aria:'Carga por exercício'}); };
   desenhaCarga(sel);
   const se=$('selEx'); if(se) se.onchange=()=>{ store.set('evoEx', se.value); desenhaCarga(se.value); };
-  linha($('chPeso'), pesos.map(x=>({x:x.d.slice(8)+'/'+x.d.slice(5,7), y:x.kg, tip:'<b>'+fmtBR(x.kg)+' kg</b>'})), {fmtY:v=>fmtBR(Math.round(v*10)/10), vazio:'Registre o peso 1× por semana, sempre em jejum.', aria:'Peso corporal'});
+  linha($('chPeso'), pesos.map(x=>({x:x.d.slice(8)+'/'+x.d.slice(5,7), y:x.kg, tip:'<b>'+fmtBR(x.kg)+' kg</b>'})), {fmtY:v=>fmtBR(Math.round(v*10)/10), meta: perfil().pesoMeta, vazio:'Registre o peso 1× por semana, sempre em jejum.', aria:'Peso corporal'});
   $('addPeso').onclick=()=>{ const v=num($('novoPeso').value); if(!v){ toast('Informe o peso'); return; } let p=store.get('peso',[]); if(p.length && p[p.length-1].d===today()) p[p.length-1].kg=v; else p.push({d:today(),kg:v}); store.set('peso',p); const pf=store.get('perfil',{}); pf.peso=v; store.set('perfil',pf); toast('Peso registrado · dieta recalculada'); renderEvolucao(); };
 }
 
@@ -429,13 +572,16 @@ function closeSheet(){ $('sheetWrap').classList.remove('show'); }
 $('sheetWrap').onclick=e=>{ if(e.target.id==='sheetWrap') closeSheet(); };
 function camposPerfil(p){
   return '<div class="grid2"><div class="field"><label>Peso (kg)</label><input class="inp" id="pPeso" inputmode="decimal" value="'+p.peso+'"></div><div class="field"><label>Altura (cm)</label><input class="inp" id="pAlt" inputmode="numeric" value="'+p.altura+'"></div>'+
-    '<div class="field"><label>Idade</label><input class="inp" id="pIdade" inputmode="numeric" value="'+p.idade+'"></div><div class="field"><label>Seu 5 km (mm:ss)</label><input class="inp" id="pT5" inputmode="numeric" value="'+esc(p.t5k)+'"></div></div>'+
+    '<div class="field"><label>Idade</label><input class="inp" id="pIdade" inputmode="numeric" value="'+p.idade+'"></div><div class="field"><label>Peso-meta (kg)</label><input class="inp" id="pMeta" inputmode="decimal" value="'+(p.pesoMeta||'')+'"></div>'+
+    '<div class="field"><label>Seu 5 km (mm:ss)</label><input class="inp" id="pT5" inputmode="numeric" value="'+esc(p.t5k)+'"></div></div>'+
     '<div class="field"><label>Objetivo</label><div class="seg" id="pObj">'+[['perder','Perder gordura'],['manter','Manter'],['ganhar','Ganhar massa']].map(([k,n])=>'<button type="button" data-o="'+k+'" class="'+(p.objetivo===k?'sel':'')+'">'+n+'</button>').join('')+'</div></div>';
 }
 function lerPerfil(){
   const p = perfil(); const o = document.querySelector('#pObj .sel');
-  const np = { peso:num($('pPeso').value)||p.peso, altura:num($('pAlt').value)||p.altura, idade:num($('pIdade').value)||p.idade, objetivo:o?o.dataset.o:p.objetivo, t5k: segs($('pT5').value) ? $('pT5').value.trim() : p.t5k };
-  store.set('perfil', np); return np;
+  const np = { peso:num($('pPeso').value)||p.peso, altura:num($('pAlt').value)||p.altura, idade:num($('pIdade').value)||p.idade, objetivo:o?o.dataset.o:p.objetivo, pesoMeta:num($('pMeta').value)||p.pesoMeta, v:2, t5k: segs($('pT5').value) ? $('pT5').value.trim() : p.t5k };
+  store.set('perfil', np);
+  const pe=store.get('peso',[]); if(!pe.length || Math.abs(pe[pe.length-1].kg-np.peso)>0.05){ if(pe.length && pe[pe.length-1].d===today()) pe[pe.length-1].kg=np.peso; else pe.push({d:today(),kg:np.peso}); store.set('peso',pe); }
+  return np;
 }
 function ligarObj(){ document.querySelectorAll('#pObj button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#pObj button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); }); }
 function sheetPerfil(){
@@ -515,6 +661,7 @@ function route(){
   closeSheet(); overlay.classList.remove('show'); clearInterval(tInt);
   const h = location.hash.replace(/^#\/?/,'');
   const [a,b] = h.split('/');
+  if(a.startsWith('importar')){ const n=importarLink(location.hash.split('?')[1]||''); toast(n? n+' corrida(s) importada(s) ✅' : 'Nenhuma corrida nova no link'); location.replace('#/corrida'); return; }
   if(a==='forca' && b) renderTreino(b);
   else if(a==='forca') renderForca();
   else if(a==='corrida') renderCorrida();

@@ -72,62 +72,63 @@ const REGRAS_HIBRIDO = [
 ];
 
 /* --------------------------- CORRIDA (almoço + domingo) ---------------------------
-   Tokens de ritmo (substituídos pelos seus ritmos calculados a partir do tempo de 5 km):
-   {leve} {limiar} {10k} {int} {tiro}
+   O plano se ajusta ao seu nível:
+   - ritmos {leve} {limiar} {10k} {int} {tiro} vêm do seu tempo de 5 km
+   - o longão parte do seu maior longão recente: {km} = base + "rel"
    ------------------------------------------------------------------------------- */
 const AQ = "Aquecimento: 10 min de trote leve + 4 educativos (skipping, anfersen).";
 const DQ = "Desaquecimento: 5 min de trote e alongamento leve.";
 const CORRIDA = [
-  { fase:"Base", s:[
-    { t:"Q", nome:"Tiros curtos", principal:"6 × 400 m em {tiro} — recuperação: 2 min de trote", min:40, km:5.5 },
-    { t:"L", nome:"Rodagem leve", principal:"25 min contínuos em {leve} + 4 acelerações de 20 s", min:35, km:4.5 },
-    { t:"LONG", nome:"Longão", principal:"5 km em {leve}, conversando", min:35, km:5 } ]},
-  { fase:"Base", s:[
-    { t:"Q", nome:"Tiros curtos", principal:"8 × 400 m em {tiro} — recuperação: 2 min de trote", min:45, km:6 },
-    { t:"L", nome:"Rodagem leve", principal:"30 min contínuos em {leve}", min:40, km:5 },
-    { t:"LONG", nome:"Longão", principal:"6 km em {leve}", min:42, km:6 } ]},
-  { fase:"Base", s:[
+  { fase:"Construção", s:[
+    { t:"Q", nome:"Intervalado", principal:"6 × 600 m em {int} — recuperação: 2 min de trote", min:42, km:6 },
+    { t:"L", nome:"Rodagem leve", principal:"35 min contínuos em {leve} + 4 acelerações de 20 s", min:40, km:5.5 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}, conversando", rel:0 } ]},
+  { fase:"Construção", s:[
     { t:"Q", nome:"Intervalado", principal:"5 × 800 m em {int} — recuperação: 2 min de trote", min:45, km:6.5 },
-    { t:"T", nome:"Limiar fracionado", principal:"3 × 5 min em {limiar} — recuperação: 2 min de trote", min:40, km:6 },
-    { t:"LONG", nome:"Longão", principal:"7 km em {leve}", min:48, km:7 } ]},
-  { fase:"Recuperação", s:[
-    { t:"Q", nome:"Tiros soltos", principal:"6 × 400 m em {tiro}, sem forçar — recuperação: 2 min", min:40, km:5.5 },
-    { t:"L", nome:"Rodagem leve", principal:"25 min em {leve}", min:35, km:4.5 },
-    { t:"LONG", nome:"Longão curto", principal:"5 km em {leve}", min:35, km:5 } ]},
+    { t:"T", nome:"Limiar fracionado", principal:"3 × 6 min em {limiar} — recuperação: 2 min de trote", min:42, km:6.5 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:1 } ]},
   { fase:"Construção", s:[
-    { t:"Q", nome:"Intervalado", principal:"5 × 1000 m em {int} — recuperação: 2 min de trote", min:50, km:7.5 },
+    { t:"Q", nome:"Intervalado", principal:"6 × 800 m em {int} — recuperação: 90 s de trote", min:48, km:7 },
     { t:"T", nome:"Limiar contínuo", principal:"20 min contínuos em {limiar}", min:40, km:6.5 },
-    { t:"LONG", nome:"Longão", principal:"8 km em {leve}", min:55, km:8 } ]},
-  { fase:"Construção", s:[
-    { t:"Q", nome:"Intervalado", principal:"6 × 800 m em {int} — recuperação: 90 s de trote", min:50, km:7.5 },
-    { t:"T", nome:"Progressivo", principal:"30 min: 20 min em {leve} e os últimos 10 min em {10k}", min:45, km:6.5 },
-    { t:"LONG", nome:"Longão", principal:"9 km em {leve}", min:62, km:9 } ]},
-  { fase:"Construção", s:[
-    { t:"Q", nome:"Intervalado longo", principal:"4 × 1200 m em {int} — recuperação: 2 min de trote", min:50, km:7.5 },
-    { t:"T", nome:"Limiar fracionado", principal:"2 × 10 min em {limiar} — recuperação: 2 min", min:45, km:7 },
-    { t:"LONG", nome:"Longão", principal:"10 km em {leve}", min:68, km:10 } ]},
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:2 } ]},
   { fase:"Recuperação", s:[
-    { t:"Q", nome:"Velocidade", principal:"8 × 200 m rápidos em {tiro} — recuperação: 200 m caminhando", min:35, km:5 },
-    { t:"L", nome:"Rodagem leve", principal:"30 min em {leve}", min:40, km:5 },
-    { t:"LONG", nome:"Longão curto", principal:"7 km em {leve}", min:48, km:7 } ]},
+    { t:"Q", nome:"Velocidade", principal:"8 × 200 m em {tiro} — recuperação: 200 m caminhando", min:35, km:5 },
+    { t:"L", nome:"Rodagem leve", principal:"30 min em {leve}", min:35, km:4.5 },
+    { t:"LONG", nome:"Longão curto", principal:"{km} km em {leve}", rel:-1 } ]},
+  { fase:"Desenvolvimento", s:[
+    { t:"Q", nome:"Intervalado", principal:"5 × 1000 m em {int} — recuperação: 2 min de trote", min:50, km:7.5 },
+    { t:"T", nome:"Limiar fracionado", principal:"2 × 10 min em {limiar} — recuperação: 2 min", min:45, km:7 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:2 } ]},
+  { fase:"Desenvolvimento", s:[
+    { t:"Q", nome:"Intervalado longo", principal:"4 × 1200 m em {int} — recuperação: 2 min de trote", min:50, km:7.5 },
+    { t:"T", nome:"Progressivo", principal:"35 min: 23 min em {leve} e os últimos 12 min em {10k}", min:45, km:6.5 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:3 } ]},
+  { fase:"Desenvolvimento", s:[
+    { t:"Q", nome:"Tiros", principal:"10 × 400 m em {tiro} — recuperação: 90 s de trote", min:50, km:7.5 },
+    { t:"T", nome:"Limiar contínuo", principal:"25 min contínuos em {limiar}", min:45, km:7 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:4 } ]},
+  { fase:"Recuperação", s:[
+    { t:"Q", nome:"Tiros soltos", principal:"6 × 400 m em {tiro}, relaxado — recuperação: 2 min", min:40, km:5.5 },
+    { t:"L", nome:"Rodagem leve", principal:"30 min em {leve}", min:35, km:4.5 },
+    { t:"LONG", nome:"Longão curto", principal:"{km} km em {leve}", rel:1 } ]},
   { fase:"Afiar", s:[
     { t:"Q", nome:"Intervalado longo", principal:"3 × 1600 m em {int} — recuperação: 3 min de trote", min:50, km:8 },
-    { t:"T", nome:"Limiar contínuo", principal:"25 min contínuos em {limiar}", min:45, km:7 },
-    { t:"LONG", nome:"Longão", principal:"11 km em {leve}", min:75, km:11 } ]},
-  { fase:"Afiar", s:[
-    { t:"Q", nome:"Tiros", principal:"10 × 400 m em {tiro} — recuperação: 90 s de trote", min:50, km:7.5 },
     { t:"T", nome:"Ritmo de prova", principal:"5 km em {10k}", min:45, km:7 },
-    { t:"LONG", nome:"Longão", principal:"12 km em {leve}", min:82, km:12 } ]},
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:4 } ]},
+  { fase:"Afiar", s:[
+    { t:"Q", nome:"Intervalado", principal:"6 × 1000 m em {int} — recuperação: 90 s de trote", min:52, km:8.5 },
+    { t:"T", nome:"Limiar fracionado", principal:"2 × 12 min em {limiar} — recuperação: 2 min", min:48, km:7.5 },
+    { t:"LONG", nome:"Longão", principal:"{km} km em {leve}", rel:5 } ]},
   { fase:"Polimento", s:[
     { t:"Q", nome:"Intervalado", principal:"5 × 1000 m em {10k} — recuperação: 2 min", min:45, km:7 },
     { t:"L", nome:"Rodagem leve", principal:"30 min em {leve} + 6 acelerações de 20 s", min:40, km:5 },
-    { t:"LONG", nome:"Longão curto", principal:"8 km em {leve}", min:55, km:8 } ]},
+    { t:"LONG", nome:"Longão curto", principal:"{km} km em {leve}", rel:1 } ]},
   { fase:"Teste", s:[
     { t:"Q", nome:"Tiros soltos", principal:"4 × 400 m em {int}, relaxado — recuperação: 2 min", min:30, km:4 },
     { t:"L", nome:"Rodagem leve", principal:"20 min em {leve}", min:30, km:3.5 },
-    { t:"TESTE", nome:"TESTE DE 10 KM", principal:"10 km no seu melhor ritmo — comece em {10k} e acelere nos últimos 2 km", min:60, km:10 } ]}
+    { t:"TESTE", nome:"TESTE DE 10 KM", principal:"10 km no seu melhor — comece em {10k} e acelere nos últimos 2 km", min:65, km:10 } ]}
 ];
-const DIA_SESSAO = { Q:"Seg ou Qua · almoço", L:"Qua ou Sex · almoço", T:"Qua ou Sex · almoço", LONG:"Domingo", TESTE:"Domingo" };
+const DIA_SESSAO = { Q:"Quarta · almoço", L:"Sexta · almoço", T:"Sexta · almoço", LONG:"Domingo", TESTE:"Domingo" };
 
 /* --------------------------- ALIMENTAÇÃO ---------------------------
    Valores aproximados (Tabela TACO / rótulos). por: 'g' = por 100 g | 'un' = por unidade | 'ml' = por 100 ml
@@ -157,18 +158,18 @@ const CAFE_PRETO = "Café preto sem açúcar à vontade.";
 
 /* Refeições-base (~2.400 kcal). O app reescala as porções para a sua meta. */
 const DIETA = [
-  { id:"cafe", nome:"Café da manhã", hora:"antes da musculação", itens:[["pao",2],["ovo",3],["leite",200],["banana",1],["oleo",1]],
-    trocas:["Pão ↔ 4 colheres de cuscuz ou 2 fatias de pão de forma","Ovos ↔ 1 lata de sardinha"], dica:"Treina muito cedo? Coma só a banana antes e o resto logo depois do treino." },
-  { id:"pos", nome:"Pós-treino", hora:"depois da musculação", itens:[["leite",300],["aveia",40],["banana",1]],
-    trocas:["Vitamina ↔ iogurte natural + aveia + banana"], dica:"Bata no liquidificador: vitamina barata com proteína e carboidrato." },
-  { id:"almoco", nome:"Almoço", hora:"depois da corrida", itens:[["arroz",150],["feijao",140],["frango",150],["legumes",1],["oleo",1],["laranja",1]],
-    trocas:["Frango ↔ carne moída, fígado (1×/semana) ou 4 ovos","Arroz ↔ macarrão ou batata (o dobro do peso)"], dica:"Prato padrão brasileiro é a melhor refeição de atleta que existe." },
-  { id:"lanche", nome:"Lanche da tarde", hora:"meio da tarde", itens:[["pao",1],["ovo",2],["banana",1]],
-    trocas:["Ovos ↔ sardinha ou frango desfiado","Pão ↔ cuscuz"], dica:"Leve ovos cozidos de casa: proteína mais barata que existe." },
-  { id:"jantar", nome:"Jantar", hora:"noite", itens:[["arroz",120],["feijao",100],["carne",120],["legumes",1],["oleo",1]],
-    trocas:["Carne moída ↔ frango, omelete de 3 ovos ou sardinha","Arroz ↔ batata, mandioca ou macarrão"], dica:"Faça marmitas no domingo: cozinhe 1 kg de frango e 1 kg de carne moída de uma vez." },
-  { id:"ceia", nome:"Ceia", hora:"antes de dormir", itens:[["leite",200],["amendoim",15]],
-    trocas:["Leite ↔ iogurte natural"], dica:"Proteína lenta antes de dormir ajuda a recuperação." }
+  { id:"cafe", nome:"Café da manhã", hora:"antes da musculação", itens:[["ovo",3],["pao",1],["leite",200],["banana",1]],
+    trocas:["Pão ↔ 3 colheres de cuscuz ou 1 tapioca pequena","3 ovos ↔ 1 lata de sardinha + 1 ovo"], dica:"Proteína logo cedo segura a fome da manhã inteira." },
+  { id:"pos", nome:"Pós-treino", hora:"depois da musculação", itens:[["leite",300],["aveia",30],["banana",1]],
+    trocas:["Vitamina ↔ iogurte natural + aveia + fruta"], dica:"Bata no liquidificador. Se quiser mais proteína, 2 colheres de leite em pó desnatado custam pouco." },
+  { id:"almoco", nome:"Almoço", hora:"depois da corrida", itens:[["arroz",120],["feijao",120],["frango",170],["legumes",2],["oleo",1]],
+    trocas:["Frango ↔ carne moída magra, fígado (1×/semana) ou 4 ovos","Arroz ↔ batata ou mandioca (o dobro do peso)"], dica:"Metade do prato de salada e legumes: enche, quase não tem caloria." },
+  { id:"lanche", nome:"Lanche da tarde", hora:"meio da tarde", itens:[["ovo",2],["frango",60],["laranja",1]],
+    trocas:["Ovos + frango ↔ 1 lata de sardinha","Laranja ↔ qualquer fruta da estação"], dica:"Leve ovos cozidos e frango desfiado de casa: o lanche mais barato e mais proteico." },
+  { id:"jantar", nome:"Jantar", hora:"noite", itens:[["arroz",90],["feijao",100],["carne",140],["legumes",2],["oleo",1]],
+    trocas:["Carne moída ↔ frango, omelete de 3 ovos ou sardinha","Arroz ↔ batata ou abóbora"], dica:"Faça marmitas no domingo: 1,5 kg de frango e 1 kg de carne moída rendem a semana." },
+  { id:"ceia", nome:"Ceia", hora:"antes de dormir", itens:[["iogurte",1],["amendoim",10]],
+    trocas:["Iogurte ↔ 200 ml de leite"], dica:"Proteína antes de dormir ajuda a preservar músculo durante o déficit." }
 ];
 
 /* Preços estimados (varejo, São Paulo, 2026) — edite no app conforme o seu mercado. */
@@ -185,7 +186,8 @@ const COMPRAS = {
   amendoim: { un:"pote 1 kg", g:1000, preco:30 },
   laranja:  { un:"dúzia", q:12, preco:9 },
   legumes:  { un:"semana (feira)", fixo:true, preco:25 },
-  oleo:     { un:"garrafa 900 ml", q:180, preco:9 }
+  oleo:     { un:"garrafa 900 ml", q:180, preco:9 },
+  iogurte:  { un:"pote 170 g", q:1, preco:3 }
 };
 /* arroz: o pacote é de arroz cru; 1 g cru ≈ 2,6 g cozido */
 COMPRAS.arroz.cru = 1/2.6; COMPRAS.feijao.cru = 1/2.3;
