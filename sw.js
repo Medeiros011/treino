@@ -1,7 +1,7 @@
 /* Meus Treinos — service worker v6
    - abre sem internet (app, dados, ícones, fonte e imagens dos exercícios já vistas)
    - página principal e dados: rede primeiro, então cada versão nova chega sozinha */
-const CACHE = 'treinos-v7';
+const CACHE = 'treinos-v8';
 const ASSETS = ['./', './index.html', './app.js', './dados.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
